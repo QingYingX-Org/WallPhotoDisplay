@@ -47,7 +47,13 @@ const uploadPath = process.env.UPLOAD_PATH || path.join(__dirname, isProduction 
 app.use('/uploads', express.static(uploadPath))
 
 // Vue SPA support - must be after API routes
-app.use(history())
+// Skip history fallback for /uploads paths to allow direct image access
+app.use((req, res, next) => {
+  if (req.path.startsWith('/uploads/')) {
+    return next()
+  }
+  history()(req, res, next)
+})
 
 // Static files - Vue build output
 // In production: dist/server -> .. (which is dist/)
