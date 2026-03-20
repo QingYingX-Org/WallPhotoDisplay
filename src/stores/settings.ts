@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { ThemeMode, SortBy } from '@/types'
 
 // LocalStorage key
@@ -22,22 +22,34 @@ interface StoredSettings {
  * Settings Store - 浏览设置状态管理
  */
 export const useSettingsStore = defineStore('settings', () => {
-  // Helper to get default columns based on screen width
-  const getDefaultColumns = (): number => {
+  // 根据窗口宽度计算自适应列数
+  const getAdaptiveColumns = (): number => {
     if (typeof window !== 'undefined') {
-      if (window.innerWidth < 768) {
-        return 2
-      }
-      if (window.innerWidth < 1200) {
-        return 4
-      }
-      return 5
+      const w = window.innerWidth
+      if (w < 596) return 2
+      if (w < 768) return 3
+      if (w < 1200) return 4
+      if (w < 1600) return 5
+      return 6
     }
     return 5
   }
 
-  // State
-  const columns = ref<number>(getDefaultColumns())            // 瀑布流列数
+  // State (0 = 自适应)
+  const columns = ref<number>(0)                              // 瀑布流列数，0表示自适应
+  const _adaptiveColumns = ref<number>(getAdaptiveColumns())  // 当前自适应计算值
+
+  // 实际生效的列数
+  const effectiveColumns = computed(() =>
+    columns.value === 0 ? _adaptiveColumns.value : columns.value
+  )
+
+  // 监听窗口大小变化，更新自适应列数
+  let _resizeHandler: (() => void) | null = null
+  if (typeof window !== 'undefined') {
+    _resizeHandler = () => { _adaptiveColumns.value = getAdaptiveColumns() }
+    window.addEventListener('resize', _resizeHandler)
+  }
   const selectedTags = ref<string[]>([])                      // 筛选标签
   const selectedUsers = ref<number[]>([])                     // 筛选用户
   const likedByMe = ref<boolean>(false)                       // 只看我赞过的
@@ -90,10 +102,10 @@ export const useSettingsStore = defineStore('settings', () => {
   // Actions
 
   /**
-   * 设置瀑布流列数
+   * 设置瀑布流列数（0 = 自适应）
    */
   function setColumns(value: number): void {
-    if (value >= 2 && value <= 6) {
+    if (value === 0 || (value >= 2 && value <= 6)) {
       columns.value = value
     }
   }
@@ -185,7 +197,7 @@ export const useSettingsStore = defineStore('settings', () => {
    * 重置所有设置为默认值
    */
   function resetToDefaults(): void {
-    columns.value = getDefaultColumns()
+    columns.value = 0
     selectedTags.value = []
     selectedUsers.value = []
     likedByMe.value = false
@@ -200,6 +212,7 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     // State
     columns,
+    effectiveColumns,
     selectedTags,
     selectedUsers,
     likedByMe,

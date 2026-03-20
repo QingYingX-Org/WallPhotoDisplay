@@ -16,7 +16,7 @@
         <!-- Photo Waterfall -->
         <PhotoWaterfall
           :photos="photosStore.photos"
-          :columns="settingsStore.columns"
+          :columns="settingsStore.effectiveColumns"
           :loading="photosStore.loading"
           :has-more="photosStore.hasMore"
           :selectable="multiSelect.isSelectionMode.value"

@@ -11,9 +11,25 @@
       <div class="setting-group">
         <div class="setting-header">
           <label class="setting-label">瀑布流列数</label>
-          <span class="setting-value">{{ localSettings.columns }} 列</span>
+          <span class="setting-value">{{ localSettings.columns === 0 ? '自适应' : localSettings.columns + ' 列' }}</span>
         </div>
         <div class="column-options">
+          <button
+            type="button"
+            class="column-option"
+            :class="{ active: localSettings.columns === 0 }"
+            @click="localSettings.columns = 0"
+          >
+            <div class="column-preview adaptive-preview">
+              <svg viewBox="0 0 24 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="1" y="1" width="6" height="14" rx="1" opacity="0.4"/>
+                <rect x="9" y="1" width="6" height="9" rx="1" opacity="0.7"/>
+                <rect x="17" y="1" width="6" height="12" rx="1" opacity="0.55"/>
+                <path d="M2 13l4-4M10 8l4-4M18 11l4-4" stroke-width="1" opacity="0.3"/>
+              </svg>
+            </div>
+            <span class="column-label">自适应</span>
+          </button>
           <button
             v-for="col in columnOptions"
             :key="col"
@@ -177,7 +193,7 @@ interface LocalSettings {
 }
 
 const localSettings = reactive<LocalSettings>({
-  columns: 4,
+  columns: 0,
   sortBy: 'created_at_desc',
   theme: 'system',
   customAccentColor: '#007AFF'
@@ -252,7 +268,7 @@ function handleSave(): void {
 
 // Reset to defaults
 function resetToDefaults(): void {
-  localSettings.columns = window.innerWidth < 768 ? 2 : 5
+  localSettings.columns = 0
   localSettings.sortBy = 'created_at_desc'
   localSettings.theme = 'system'
   localSettings.customAccentColor = '#007AFF'
@@ -323,6 +339,16 @@ function resetToDefaults(): void {
   display: flex;
   gap: 2px;
   height: 24px;
+}
+
+.column-preview.adaptive-preview {
+  height: 24px;
+  align-items: center;
+}
+
+.adaptive-preview svg {
+  width: 28px;
+  height: 18px;
 }
 
 .column-bar {
