@@ -11,7 +11,8 @@ export const useConfigStore = defineStore('config', () => {
         menuIconUrl: '',
         forceLogin: false,
         uploadReview: false,
-        allowRegistration: false
+        allowRegistration: false,
+        enableApiKey: false
     })
 
     const isLoading = ref(false)

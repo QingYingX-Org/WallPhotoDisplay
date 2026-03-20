@@ -4,6 +4,8 @@ import type { SignOptions } from 'jsonwebtoken'
 import dotenv from 'dotenv'
 import type { AuthenticatedRequest, JwtPayload } from '../types/index.js'
 import { User } from '../models/index.js'
+import ApiKey from '../models/ApiKey.js'
+import { loadConfig } from '../controllers/configController.js'
 
 dotenv.config()
 
@@ -174,6 +176,57 @@ export function ownerOrAdminMiddleware(getResourceUserId: GetResourceUserId) {
     
     next()
   }
+}
+
+/**
+ * API Key 认证中间件
+ * 验证请求头中的 X-API-Key，并检查系统是否启用了 API Key 功能
+ */
+export async function apiKeyAuthMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+  const apiKeyHeader = req.headers['x-api-key'] as string | undefined
+
+  if (!apiKeyHeader) {
+    res.status(401).json({ success: false, error: 'No API key provided' })
+    return
+  }
+
+  // 检查系统是否启用了 API Key 功能
+  const config = await loadConfig()
+  if (!config.enableApiKey) {
+    res.status(403).json({ success: false, error: 'API Key 功能未启用' })
+    return
+  }
+
+  const keyRecord = ApiKey.findByRawKey(apiKeyHeader)
+  if (!keyRecord) {
+    res.status(401).json({ success: false, error: 'Invalid API key' })
+    return
+  }
+
+  // 检查用户是否被封禁
+  const isBanned = User.isBanned(keyRecord.userId)
+  if (isBanned) {
+    res.status(403).json({ success: false, error: '您的账号已被封禁，无法进行此操作' })
+    return
+  }
+
+  // 更新最后使用时间
+  ApiKey.updateLastUsed(keyRecord.id)
+
+  // 查找用户信息以获取 role
+  const user = User.findById(keyRecord.userId)
+  if (!user) {
+    res.status(401).json({ success: false, error: 'User not found' })
+    return
+  }
+
+  req.user = {
+    id: user.id,
+    username: user.username,
+    role: user.role
+  }
+
+  next()
 }
 
 export default {

@@ -89,6 +89,25 @@ const migrations: Migration[] = [
         db.exec("CREATE INDEX IF NOT EXISTS idx_users_is_banned ON users(is_banned)")
       }
     }
+  },
+  {
+    name: '004_add_api_keys',
+    up: () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS api_keys (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          key_hash VARCHAR(64) NOT NULL,
+          key_prefix VARCHAR(20) NOT NULL,
+          name VARCHAR(50) NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          last_used_at DATETIME,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `)
+      db.exec('CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id)')
+      db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys(key_hash)')
+    }
   }
 ]
 

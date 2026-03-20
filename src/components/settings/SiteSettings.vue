@@ -117,6 +117,22 @@
         </div>
       </div>
 
+      <div class="form-group">
+        <div class="setting-row">
+          <div class="setting-info">
+            <label class="setting-label">API Key</label>
+            <span class="help-text">开启后，用户可以创建 API Key 并通过 API 上传图片</span>
+          </div>
+          <label class="switch">
+            <input 
+              v-model="form.enableApiKey" 
+              type="checkbox" 
+            />
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
       <div class="form-actions">
         <button type="submit" class="btn btn-primary" :disabled="loading">
           {{ loading ? '保存中...' : '保存设置' }}
@@ -144,7 +160,8 @@ const form = ref({
   menuIconUrl: '',
   forceLogin: false,
   uploadReview: false,
-  allowRegistration: false
+  allowRegistration: false,
+  enableApiKey: false
 })
 
 // Watch for config changes to update form (e.g. if loaded after mount)
@@ -156,7 +173,8 @@ watch(config, (newConfig) => {
     menuIconUrl: newConfig?.menuIconUrl ?? '',
     forceLogin: !!newConfig?.forceLogin,
     uploadReview: !!newConfig?.uploadReview,
-    allowRegistration: !!newConfig?.allowRegistration
+    allowRegistration: !!newConfig?.allowRegistration,
+    enableApiKey: !!newConfig?.enableApiKey
   }
 }, { immediate: true })
 

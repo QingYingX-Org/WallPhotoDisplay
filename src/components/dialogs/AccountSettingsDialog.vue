@@ -88,10 +88,12 @@ import Modal from '../common/Modal.vue'
 import BrowseSettings from '../settings/BrowseSettings.vue'
 import ProfileSettings from '../settings/ProfileSettings.vue'
 import PhotoManager from '../settings/PhotoManager.vue'
+import ApiKeySettings from '../settings/ApiKeySettings.vue'
 import LoginForm from '../common/LoginForm.vue'
 import RegisterDialog from './RegisterDialog.vue'
 import ResetPasswordDialog from './ResetPasswordDialog.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useConfigStore } from '@/stores/config'
 
 // Icons
 const IconProfile = h('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2 }, [
@@ -110,6 +112,10 @@ const IconPhotos = h('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'curre
   h('polyline', { points: '21 15 16 10 5 21' })
 ])
 
+const IconApiKey = h('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2 }, [
+  h('path', { d: 'M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4' })
+])
+
 interface Props {
   modelValue?: boolean
 }
@@ -123,6 +129,7 @@ const emit = defineEmits<{
 }>()
 
 const authStore = useAuthStore()
+const configStore = useConfigStore()
 const isLoggedIn = computed(() => authStore.isLoggedIn)
 
 // State
@@ -163,6 +170,16 @@ const menuItems = computed(() => {
       color: '#34C759',
       component: PhotoManager
     })
+
+    if (configStore.config.enableApiKey) {
+      items.push({
+        id: 'apikey',
+        label: 'API Key',
+        icon: IconApiKey,
+        color: '#FF9500',
+        component: ApiKeySettings
+      })
+    }
   }
 
   return items

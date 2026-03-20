@@ -146,6 +146,7 @@ export interface SystemConfig {
   forceLogin?: boolean
   uploadReview?: boolean
   allowRegistration?: boolean
+  enableApiKey?: boolean
   // SMTP Settings
   smtpHost?: string
   smtpPort?: number
@@ -153,4 +154,15 @@ export interface SystemConfig {
   smtpPass?: string
   smtpFrom?: string
   smtpSecure?: boolean
+}
+
+// API Key 类型
+export interface ApiKeyInfo {
+  id: number
+  userId: number
+  keyPrefix: string
+  name: string
+  createdAt: string
+  lastUsedAt: string | null
+  rawKey?: string
 }

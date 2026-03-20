@@ -14,6 +14,7 @@ const DEFAULT_CONFIG = {
   forceLogin: false,
   uploadReview: false,
   allowRegistration: false,
+  enableApiKey: false,
   smtpHost: '',
   smtpPort: 465,
   smtpUser: '',

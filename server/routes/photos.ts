@@ -15,7 +15,7 @@ import {
   toggleLike,
   getLikeStatus
 } from '../controllers/photoController.js'
-import { authMiddleware, optionalAuthMiddleware, adminMiddleware } from '../middleware/auth.js'
+import { authMiddleware, optionalAuthMiddleware, adminMiddleware, apiKeyAuthMiddleware } from '../middleware/auth.js'
 import { uploadMultiple, handleUploadError } from '../middleware/upload.js'
 
 const router = Router()
@@ -68,6 +68,13 @@ router.get('/:id', optionalAuthMiddleware, getPhotoById)
  * @access Protected
  */
 router.post('/', authMiddleware, uploadMultiple, handleUploadError, uploadPhotos)
+
+/**
+ * @route POST /api/photos/api-upload
+ * @desc 通过 API Key 上传图片
+ * @access API Key
+ */
+router.post('/api-upload', apiKeyAuthMiddleware, uploadMultiple, handleUploadError, uploadPhotos)
 
 /**
  * @route PUT /api/photos/batch/tags

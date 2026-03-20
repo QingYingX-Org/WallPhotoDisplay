@@ -17,6 +17,7 @@ import userRoutes from './routes/users.js'
 import photoRoutes from './routes/photos.js'
 import tagRoutes from './routes/tags.js'
 import configRoutes from './routes/config.js'
+import apiKeyRoutes from './routes/apiKeys.js'
 import { runMigrations } from './utils/migrator.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -38,6 +39,7 @@ app.use('/api/users', userRoutes)
 app.use('/api/photos', photoRoutes)
 app.use('/api/tags', tagRoutes)
 app.use('/api/config', configRoutes)
+app.use('/api/api-keys', apiKeyRoutes)
 
 // Static files - uploaded photos
 // In production: dist/server -> ../../data/uploads
