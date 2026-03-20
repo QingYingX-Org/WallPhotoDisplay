@@ -87,6 +87,7 @@ Wall Photo Display 适合部署在自己的服务器、NAS 或云主机上，用
 最省事的方式是使用 Docker。
 
 ```bash
+# 默认用户名 admin 密码 admin123，部署后请尽快修改
 docker compose up -d
 ```
 
