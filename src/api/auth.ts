@@ -56,7 +56,7 @@ const authApi = {
   },
 
   /**
-   * 发送邮箱验证码
+   * 发送邮箱验证码（支持未登录状态调用）
    */
   sendVerificationCode(email: string): Promise<ApiResponse<void>> {
     return request.post('/auth/send-verification-code', { email })

@@ -36,7 +36,7 @@ export async function getCaptcha(_req: AuthenticatedRequest, res: Response): Pro
  */
 export async function register(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const { username, password, displayName, captchaId, captchaText } = req.body as RegisterRequestBody & { captchaId?: string; captchaText?: string }
+    const { username, password, displayName, email, verificationCode, captchaId, captchaText } = req.body as RegisterRequestBody & { captchaId?: string; captchaText?: string }
     
     // 验证人机验证码
     const config = await loadConfig()
@@ -52,10 +52,10 @@ export async function register(req: AuthenticatedRequest, res: Response): Promis
     }
 
     // 验证参数
-    if (!username || !password) {
+    if (!username || !password || !email || !verificationCode) {
       res.status(400).json({
         success: false,
-        error: 'Username and password are required'
+        error: '用户名、密码、邮箱和验证码均为必填项'
       })
       return
     }
@@ -85,12 +85,30 @@ export async function register(req: AuthenticatedRequest, res: Response): Promis
       })
       return
     }
+
+    // 验证邮箱格式
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      res.status(400).json({
+        success: false,
+        error: '邮箱格式不正确'
+      })
+      return
+    }
     
     // 检查用户名是否已存在
     if (User.existsByUsername(username)) {
       res.status(409).json({
         success: false,
         error: 'Username already exists'
+      })
+      return
+    }
+
+    // 检查邮箱是否已被使用
+    if (User.existsByEmail(email)) {
+      res.status(409).json({
+        success: false,
+        error: '该邮箱已被注册'
       })
       return
     }
@@ -103,13 +121,30 @@ export async function register(req: AuthenticatedRequest, res: Response): Promis
       })
       return
     }
+
+    // 验证邮箱验证码
+    const verification = Verification.findValid(email, verificationCode)
+    if (!verification) {
+      res.status(400).json({
+        success: false,
+        error: '验证码无效或已过期'
+      })
+      return
+    }
+
+    // 清理已使用的验证码
+    Verification.deleteByEmail(email)
+    
+    // 判断是否为第一个用户（第一个注册的用户自动成为管理员）
+    const isFirstUser = User.count() === 0
     
     // 创建用户（User.create 内部会处理密码哈希）
     const newUser = User.create({
       username,
       password: password,
       displayName: displayName || username,
-      role: 'user'
+      email,
+      role: isFirstUser ? 'admin' : 'user'
     })
     
     if (!newUser) {
@@ -119,13 +154,20 @@ export async function register(req: AuthenticatedRequest, res: Response): Promis
       })
       return
     }
+
+    // 标记邮箱已验证
+    User.verifyEmail(newUser.id, email)
     
     // 生成 JWT Token
     const token = generateToken({
       id: newUser.id,
       username: newUser.username,
-      role: newUser.role
+      role: isFirstUser ? 'admin' : 'user'
     })
+    
+    if (isFirstUser) {
+      console.log(`✓ 第一个注册用户 "${username}" 已被自动设为管理员`)
+    }
     
     // 返回用户信息（不含密码）
     res.json({
@@ -135,10 +177,10 @@ export async function register(req: AuthenticatedRequest, res: Response): Promis
         user: {
           id: newUser.id,
           username: newUser.username,
-          displayName: newUser.displayName,
-          email: newUser.email,
-          emailVerified: newUser.emailVerified,
-          role: newUser.role
+          displayName: newUser.displayName || username,
+          email: email,
+          emailVerified: true,
+          role: isFirstUser ? 'admin' : 'user'
         }
       }
     })
@@ -328,10 +370,17 @@ export async function sendVerificationCode(req: AuthenticatedRequest, res: Respo
     // Save code
     Verification.create(email, code, ip)
 
-    // Send email
+    // Send email or fallback to console
     const config = await loadConfig()
     if (!config.smtpHost) {
-      res.status(500).json({ success: false, error: 'SMTP configuration missing' })
+      // SMTP 未配置，将验证码打印到控制台
+      console.log('========================================')
+      console.log('  SMTP 未配置 - 邮箱验证码（控制台输出）')
+      console.log(`  邮箱: ${email}`)
+      console.log(`  验证码: ${code}`)
+      console.log('  有效期: 10 分钟')
+      console.log('========================================')
+      res.json({ success: true, message: 'Verification code sent (console fallback)' })
       return
     }
 
@@ -477,9 +526,16 @@ export async function resetPassword(req: AuthenticatedRequest, res: Response): P
       return
     }
 
-    // 发送邮件
+    // 发送邮件或回退到控制台输出
     if (!config.smtpHost) {
-      res.status(500).json({ success: false, error: 'SMTP configuration missing' })
+      // SMTP 未配置，将新密码打印到控制台
+      console.log('========================================')
+      console.log('  SMTP 未配置 - 密码重置（控制台输出）')
+      console.log(`  用户: ${user.username}`)
+      console.log(`  邮箱: ${user.email}`)
+      console.log(`  新密码: ${newPassword}`)
+      console.log('========================================')
+      res.json({ success: true, message: 'Password has been reset (console fallback)' })
       return
     }
 

@@ -271,6 +271,8 @@ export interface RegisterRequestBody {
   username: string
   password: string
   displayName?: string
+  email: string
+  verificationCode: string
 }
 
 /**

@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import type { ApiResponse, User, UserCreatePayload } from '@/types'
+import type { ApiResponse, User, AdminCreateUserPayload } from '@/types'
 
 /**
  * 用户更新数据
@@ -45,7 +45,7 @@ const usersApi = {
   /**
    * 创建新用户
    */
-  create(userData: UserCreatePayload): Promise<ApiResponse<User>> {
+  create(userData: AdminCreateUserPayload): Promise<ApiResponse<User>> {
     return request.post('/users', userData)
   },
 

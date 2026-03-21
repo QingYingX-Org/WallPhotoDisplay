@@ -113,16 +113,8 @@ const authStore = useAuthStore()
 const photosStore = usePhotosStore()
 const configStore = useConfigStore()
 
-// Forced Email Verification Logic
+// Forced Email Verification Logic (no longer needed - email is verified during registration)
 const showForcedVerification = ref(false)
-
-watch(() => authStore.user, (user) => {
-  if (user && (!user.email || !user.emailVerified)) {
-    showForcedVerification.value = true
-  } else {
-    showForcedVerification.value = false
-  }
-}, { immediate: true })
 
 // Component refs
 const mainContentRef = ref<InstanceType<typeof MainContent> | null>(null)

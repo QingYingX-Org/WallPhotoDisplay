@@ -1,7 +1,7 @@
 import express from 'express'
 const Router = express.Router
 import { getCaptcha, register, login, logout, getCurrentUser, sendVerificationCode, verifyEmail, resetPassword } from '../controllers/authController.js'
-import { authMiddleware } from '../middleware/auth.js'
+import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js'
 
 const router = Router()
 
@@ -43,9 +43,9 @@ router.get('/me', authMiddleware, getCurrentUser)
 /**
  * @route POST /api/auth/send-verification-code
  * @desc 发送邮箱验证码
- * @access Protected
+ * @access Public (optionalAuth)
  */
-router.post('/send-verification-code', authMiddleware, sendVerificationCode)
+router.post('/send-verification-code', optionalAuthMiddleware, sendVerificationCode)
 
 /**
  * @route POST /api/auth/verify-email

@@ -18,6 +18,15 @@ export interface UserCreatePayload {
   username: string
   password: string
   displayName?: string
+  email: string
+  verificationCode: string
+  role?: 'admin' | 'user'
+}
+
+export interface AdminCreateUserPayload {
+  username: string
+  password: string
+  displayName?: string
   role?: 'admin' | 'user'
 }
 

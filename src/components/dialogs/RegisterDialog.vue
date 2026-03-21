@@ -2,11 +2,12 @@
   <Modal
     v-model="isOpen"
     title="注册"
-    subtitle="创建新账号"
+    :subtitle="step === 1 ? '创建新账号' : '验证邮箱'"
     size="sm"
     @close="handleClose"
   >
-    <form class="register-form" @submit.prevent="handleSubmit">
+    <!-- Step 1: Fill registration form -->
+    <form v-if="step === 1" class="register-form" @submit.prevent="handleSendCode">
       <!-- Username input -->
       <div class="form-group">
         <label for="register-username" class="form-label">用户名</label>
@@ -22,6 +23,21 @@
           maxlength="20"
         />
         <span class="help-text">4-20个字符，字母、数字、下划线</span>
+      </div>
+
+      <!-- Email input -->
+      <div class="form-group">
+        <label for="register-email" class="form-label">邮箱</label>
+        <input
+          id="register-email"
+          v-model="form.email"
+          type="email"
+          class="form-input"
+          placeholder="请输入邮箱地址"
+          autocomplete="email"
+          :disabled="loading"
+          required
+        />
       </div>
 
       <!-- Password input -->
@@ -111,6 +127,51 @@
           <span>{{ error }}</span>
         </div>
       </Transition>
+    </form>
+
+    <!-- Step 2: Email verification code input -->
+    <div v-else class="register-form">
+      <p class="info-text">验证码已发送至 <strong>{{ form.email }}</strong></p>
+      
+      <div class="code-inputs" :class="{ 'shake': shake }">
+        <input
+          v-for="i in 6"
+          :key="i"
+          ref="codeInputs"
+          v-model="verificationCode[i-1]"
+          type="text"
+          maxlength="1"
+          class="code-input"
+          :class="{ 'success': isCodeSuccess, 'error': isCodeError }"
+          :disabled="loading"
+          @input="handleCodeInput(i-1, $event)"
+          @keydown.delete="handleCodeDelete(i-1, $event)"
+          @paste="handleCodePaste"
+        />
+      </div>
+
+      <div class="code-actions">
+        <button 
+          class="btn btn-text" 
+          :disabled="timer > 0 || loading"
+          @click="resendCode"
+        >
+          {{ timer > 0 ? `重新发送 (${timer}s)` : '重新发送' }}
+        </button>
+        <button class="btn btn-text" @click="backToStep1">修改信息</button>
+      </div>
+
+      <!-- Error message -->
+      <Transition name="fade">
+        <div v-if="error" class="form-error">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span>{{ error }}</span>
+        </div>
+      </Transition>
 
       <!-- Success message -->
       <Transition name="fade">
@@ -122,7 +183,7 @@
           <span>{{ success }}</span>
         </div>
       </Transition>
-    </form>
+    </div>
 
     <!-- @vue-ignore -->
     <template #footer>
@@ -136,17 +197,18 @@
           取消
         </button>
         <button
+          v-if="step === 1"
           type="submit"
           class="btn btn-primary"
-          @click="handleSubmit"
-          :disabled="loading || !isFormValid"
+          @click="handleSendCode"
+          :disabled="loading || !isStep1Valid"
         >
           <span v-if="loading" class="btn-loading">
             <svg class="spinner" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
             </svg>
           </span>
-          <span>{{ loading ? '注册中...' : '注册' }}</span>
+          <span>{{ loading ? '发送中...' : '发送验证码' }}</span>
         </button>
       </div>
     </template>
@@ -154,11 +216,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import Modal from '../common/Modal.vue'
 import CaptchaInput from '../common/CaptchaInput.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
+import authApi from '@/api/auth'
 
 interface Props {
   modelValue?: boolean
@@ -178,6 +241,7 @@ const configStore = useConfigStore()
 
 interface RegisterForm {
   username: string
+  email: string
   password: string
   confirmPassword: string
 }
@@ -188,8 +252,10 @@ const isOpen = computed({
   set: (value: boolean) => emit('update:modelValue', value)
 })
 
+const step = ref(1)
 const form = ref<RegisterForm>({
   username: '',
+  email: '',
   password: '',
   confirmPassword: ''
 })
@@ -203,45 +269,46 @@ const captchaId = ref('')
 const captchaText = ref('')
 const captchaRef = ref<InstanceType<typeof CaptchaInput> | null>(null)
 
+// Step 2 state
+const verificationCode = ref<string[]>(new Array(6).fill(''))
+const codeInputs = ref<HTMLInputElement[]>([])
+const timer = ref(0)
+const shake = ref(false)
+const isCodeSuccess = ref(false)
+const isCodeError = ref(false)
+let timerInterval: number | null = null
+
 const captchaEnabled = computed(() => configStore.config?.enableCaptcha !== false)
 
-// Form validation
-const isFormValid = computed(() => {
+// Step 1 form validation
+const isStep1Valid = computed(() => {
   const usernameValid = form.value.username.trim().length >= 4 && 
                        form.value.username.trim().length <= 20 &&
                        /^[\w]+$/.test(form.value.username.trim())
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.email.trim())
   const passwordValid = form.value.password.length >= 6
   const passwordsMatch = form.value.password === form.value.confirmPassword
   const captchaValid = captchaEnabled.value ? captchaText.value.trim() !== '' : true
   
-  return usernameValid && passwordValid && passwordsMatch && captchaValid
+  return usernameValid && emailValid && passwordValid && passwordsMatch && captchaValid
 })
-
-// Username validation helper
-const validateUsername = (username: string): string => {
-  const trimmed = username.trim()
-  if (trimmed.length < 4) return '用户名至少需要4个字符'
-  if (trimmed.length > 20) return '用户名不能超过20个字符'
-  if (!/^[\w]+$/.test(trimmed)) return '用户名只能包含字母、数字和下划线'
-  return ''
-}
-
-// Password validation helper
-const validatePassword = (password: string): string => {
-  if (password.length < 6) return '密码至少需要6个字符'
-  return ''
-}
 
 // Reset form when dialog opens
 watch(isOpen, (newValue) => {
   if (newValue) {
-    form.value = { username: '', password: '', confirmPassword: '' }
+    step.value = 1
+    form.value = { username: '', email: '', password: '', confirmPassword: '' }
     showPassword.value = false
     showConfirmPassword.value = false
     error.value = ''
     success.value = ''
     captchaId.value = ''
     captchaText.value = ''
+    verificationCode.value = new Array(6).fill('')
+    isCodeSuccess.value = false
+    isCodeError.value = false
+    timer.value = 0
+    if (timerInterval) clearInterval(timerInterval)
   }
 })
 
@@ -252,25 +319,52 @@ function handleClose(): void {
   }
 }
 
-// Handle submit
-async function handleSubmit(): Promise<void> {
-  if (!isFormValid.value || loading.value) return
+function backToStep1(): void {
+  step.value = 1
+  error.value = ''
+  verificationCode.value = new Array(6).fill('')
+  isCodeSuccess.value = false
+  isCodeError.value = false
+}
+
+function startTimer() {
+  timer.value = 60
+  if (timerInterval) clearInterval(timerInterval)
+  timerInterval = window.setInterval(() => {
+    timer.value--
+    if (timer.value <= 0 && timerInterval) {
+      clearInterval(timerInterval)
+    }
+  }, 1000)
+}
+
+// Step 1: Validate form and send verification code
+async function handleSendCode(): Promise<void> {
+  if (!isStep1Valid.value || loading.value) return
 
   loading.value = true
   error.value = ''
-  success.value = ''
 
   // Validate inputs
-  const usernameError = validateUsername(form.value.username)
-  if (usernameError) {
-    error.value = usernameError
+  const trimmedUsername = form.value.username.trim()
+  if (trimmedUsername.length < 4) {
+    error.value = '用户名至少需要4个字符'
+    loading.value = false
+    return
+  }
+  if (trimmedUsername.length > 20) {
+    error.value = '用户名不能超过20个字符'
+    loading.value = false
+    return
+  }
+  if (!/^[\w]+$/.test(trimmedUsername)) {
+    error.value = '用户名只能包含字母、数字和下划线'
     loading.value = false
     return
   }
 
-  const passwordError = validatePassword(form.value.password)
-  if (passwordError) {
-    error.value = passwordError
+  if (form.value.password.length < 6) {
+    error.value = '密码至少需要6个字符'
     loading.value = false
     return
   }
@@ -282,22 +376,16 @@ async function handleSubmit(): Promise<void> {
   }
 
   try {
-    const result = await authStore.register({
-      username: form.value.username.trim(),
-      password: form.value.password
-    }, captchaEnabled.value ? captchaId.value : undefined,
-       captchaEnabled.value ? captchaText.value : undefined)
+    const response = await authApi.sendVerificationCode(form.value.email.trim())
     
-    if (result.success) {
-      success.value = '注册成功！正在跳转...'
-      
-      // authStore.register() 已经自动完成了登录，只需延迟后关闭对话框
-      setTimeout(() => {
-        emit('success')
-        isOpen.value = false
-      }, 1000)
+    if (response.success) {
+      step.value = 2
+      startTimer()
+      nextTick(() => {
+        codeInputs.value[0]?.focus()
+      })
     } else {
-      error.value = result.error || '注册失败，请稍后重试'
+      error.value = response.error || '发送验证码失败，请稍后重试'
       captchaRef.value?.reset()
     }
   } catch (e) {
@@ -306,6 +394,135 @@ async function handleSubmit(): Promise<void> {
     loading.value = false
   }
 }
+
+async function resendCode(): Promise<void> {
+  if (timer.value > 0 || loading.value) return
+  loading.value = true
+  error.value = ''
+  
+  try {
+    const response = await authApi.sendVerificationCode(form.value.email.trim())
+    if (response.success) {
+      startTimer()
+    } else {
+      error.value = response.error || '发送验证码失败'
+    }
+  } catch (e) {
+    error.value = '网络错误，请稍后重试'
+  } finally {
+    loading.value = false
+  }
+}
+
+// Step 2: Submit registration with verification code
+async function handleRegister(): Promise<void> {
+  const fullCode = verificationCode.value.join('')
+  if (fullCode.length !== 6 || loading.value) return
+
+  loading.value = true
+  error.value = ''
+  isCodeError.value = false
+
+  try {
+    const result = await authStore.register({
+      username: form.value.username.trim(),
+      password: form.value.password,
+      email: form.value.email.trim(),
+      verificationCode: fullCode
+    }, captchaEnabled.value ? captchaId.value : undefined,
+       captchaEnabled.value ? captchaText.value : undefined)
+    
+    if (result.success) {
+      isCodeSuccess.value = true
+      success.value = '注册成功！正在跳转...'
+      
+      setTimeout(() => {
+        emit('success')
+        isOpen.value = false
+      }, 1000)
+    } else {
+      isCodeError.value = true
+      shake.value = true
+      error.value = result.error || '注册失败，请稍后重试'
+      setTimeout(() => {
+        shake.value = false
+        isCodeError.value = false
+        verificationCode.value = new Array(6).fill('')
+        codeInputs.value[0]?.focus()
+      }, 1000)
+    }
+  } catch (e) {
+    error.value = '网络错误，请稍后重试'
+  } finally {
+    loading.value = false
+  }
+}
+
+// Code input handlers
+function handleCodeInput(index: number, event: Event) {
+  const input = event.target as HTMLInputElement
+  const cleanValue = input.value.replace(/\D/g, '').slice(-1)
+  
+  if (input.value !== cleanValue) {
+    input.value = cleanValue
+  }
+  
+  verificationCode.value[index] = cleanValue
+  
+  if (cleanValue && index < 5) {
+    setTimeout(() => {
+      const nextInput = codeInputs.value[index + 1]
+      if (nextInput) {
+        nextInput.focus()
+        nextInput.select()
+      }
+    }, 10)
+  } else if (cleanValue && index === 5) {
+    setTimeout(() => handleRegister(), 10)
+  }
+}
+
+function handleCodeDelete(index: number, event: KeyboardEvent) {
+  if (!verificationCode.value[index] && index > 0) {
+    event.preventDefault()
+    setTimeout(() => {
+      const prevInput = codeInputs.value[index - 1]
+      if (prevInput) {
+        prevInput.value = ''
+        verificationCode.value[index - 1] = ''
+        prevInput.focus()
+      }
+    }, 10)
+  }
+}
+
+function handleCodePaste(event: ClipboardEvent) {
+  event.preventDefault()
+  const pastedData = event.clipboardData?.getData('text')
+  if (!pastedData) return
+
+  const numbers = pastedData.replace(/\D/g, '').slice(0, 6)
+  
+  numbers.split('').forEach((num, i) => {
+    if (codeInputs.value[i]) {
+      codeInputs.value[i].value = num
+      verificationCode.value[i] = num
+    }
+  })
+  
+  setTimeout(() => {
+    if (numbers.length === 6) {
+      handleRegister()
+    } else if (numbers.length > 0) {
+      const nextIndex = Math.min(numbers.length, 5)
+      codeInputs.value[nextIndex]?.focus()
+    }
+  }, 10)
+}
+
+onUnmounted(() => {
+  if (timerInterval) clearInterval(timerInterval)
+})
 </script>
 
 <style scoped>
@@ -426,6 +643,83 @@ async function handleSubmit(): Promise<void> {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
+}
+
+.info-text {
+  text-align: center;
+  margin-bottom: var(--spacing-lg);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.code-inputs {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: var(--spacing-lg);
+}
+
+.code-input {
+  width: 3rem;
+  height: 3.5rem;
+  text-align: center;
+  font-size: 1.5rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  transition: all 0.2s;
+}
+
+.code-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.code-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.code-input.success {
+  border-color: var(--color-success);
+  box-shadow: 0 0 10px rgba(52, 199, 89, 0.3);
+}
+
+.code-input.error {
+  border-color: var(--color-error);
+  box-shadow: 0 0 10px rgba(255, 59, 48, 0.3);
+}
+
+.shake {
+  animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
+.code-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-md);
+}
+
+.btn-text {
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  cursor: pointer;
+  padding: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}
+
+.btn-text:disabled {
+  color: var(--color-text-tertiary);
+  cursor: not-allowed;
 }
 
 .dialog-actions {

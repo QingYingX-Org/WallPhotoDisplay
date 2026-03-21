@@ -1,5 +1,4 @@
 import db, { initTables } from '../config/database.js'
-import User from '../models/User.js'
 
 interface Migration {
   name: string
@@ -159,34 +158,5 @@ export function runMigrations() {
     console.log(`Successfully applied ${appliedCount} migrations`)
   } else {
     console.log('Database schema is up to date')
-  }
-
-  // 4. Ensure default admin user exists
-  ensureDefaultAdmin()
-}
-
-function ensureDefaultAdmin() {
-  const defaultAdmin = {
-    username: 'admin',
-    password: 'admin123',
-    displayName: '管理员',
-    role: 'admin' as const
-  }
-
-  try {
-    if (!User.existsByUsername(defaultAdmin.username)) {
-      console.log('Creating default admin user...')
-      const admin = User.create(defaultAdmin)
-      if (admin) {
-        console.log('✓ Default admin user created')
-        console.log(`  Username: ${admin.username}`)
-        console.log(`  Password: ${defaultAdmin.password}`)
-        console.log('  ⚠️  Please change the password after first login!')
-      }
-    }
-  } catch (error) {
-    console.error('✗ Failed to check/create default admin:', error)
-    // Don't throw here, allow server to start even if admin creation fails (e.g. DB issues)
-    // But usually if DB is broken, previous steps would have failed.
   }
 }

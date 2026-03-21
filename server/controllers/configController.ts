@@ -13,7 +13,7 @@ const DEFAULT_CONFIG = {
   menuIconUrl: '',
   forceLogin: false,
   uploadReview: false,
-  allowRegistration: false,
+  allowRegistration: true,
   enableApiKey: false,
   enableCaptcha: true,
   smtpHost: '',
